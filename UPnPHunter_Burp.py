@@ -373,11 +373,11 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
 
 
     def sendMsearch(self, ssdp_req):
-        # Send the ssdp request
+        # Send the ssdp request and retrieve response
+        buf_resp = set()
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.setblocking(0)
-        buf_resp = []
-        resp = ""
+        # Sending ssdp requests
         while len(ssdp_req):
             # Blocking socket client until the request is completely sent
             try:
@@ -388,28 +388,34 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     print("[E] Got error %s with socket when sending") % exc
                     sock.close()
                     raise exc
-                print("[!] Blocking socket until ", len(ssdp_req), " is sent")       
+                print("[!] Blocking socket until ", len(ssdp_req), " is sent.")       
                 select.select([], [sock], [])
                 continue
-        # Blocking socket until there are ssdp responses to be read or timeout is reached
-        readable, __, __ = select.select([sock], [], [], self.SSDP_TIMEOUT)
-        if not readable:
-            # Timeout reached without receiving any ssdp response
-            print("[!] Got timeout without receiving any ssdp response")
-        else:
-            # Almost an ssdp response was received
-            if readable[0]:
-                try:
-                    data = sock.recv(1024)
-                    if data:
-                        buf_resp.append(data.decode("ASCII"))
-                except socket.error, exc:
-                    print("[E] Got error %s with socket when receiving") % exc
-                    sock.close()
-                    raise exc
-        # Assemblage of the ssdp response from received data chunks 
-        resp = "".join(buf_resp)
+        # Retrieving ssdp responses
+        num_resp = 0
+        while sock:
+            # Blocking socket until there are ssdp responses to be read or timeout is reached
+            readable, __, __ = select.select([sock], [], [], self.SSDP_TIMEOUT)
+            if not readable:
+                # Timeout reached without receiving any ssdp response
+                if num_resp == 0:
+                    print("[!] Got timeout without receiving any ssdp response.")
+                break
+            else:
+                num_resp = num_resp + 1
+                # Almost an ssdp response was received
+                if readable[0]:
+                    try:
+                        data = sock.recv(1024)
+                        if data:
+                            buf_resp.add(data.decode('ASCII'))
+                    except socket.error, exc:
+                        print("[E] Got error %s with socket when receiving") % exc
+                        sock.close()
+                        raise exc
         sock.close()
+        # Assemblage of the ssdp response from received data chunks
+        resp=list(buf_resp)
         return resp
 
 
@@ -421,16 +427,17 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
         ssdp_requests = [self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL), self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV)]
         # First try with "Ssdp:All" request type
         print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
-        ssdp_response = self.sendMsearch(ssdp_requests[0])
+        ssdp_responses = self.sendMsearch(ssdp_requests[0])
         # Then try with the alternative "Root:Device" request type
-        if not ssdp_response:
+        if not ssdp_responses:
             print("[+] Retrying with \"Root:Device\" ssdp request type")
-            ssdp_response = self.sendMsearch(ssdp_requests[1])
+            ssdp_responses = self.sendMsearch(ssdp_requests[1])
         # Extract location heaader information from ssdp response
-        if ssdp_response:
-            location_result = location_regex.search(ssdp_response.decode("ASCII"))
-            if location_result and (location_result.group(1) in locations) == False:
-                locations.add(location_result.group(1))
+        if ssdp_responses:
+            for ssdp_resp in ssdp_responses:
+                location_result = location_regex.search(ssdp_resp)
+                if location_result and (location_result.group(1) in locations) == False:
+                    locations.add(location_result.group(1))
         else:
             print("[!] Unsucessfull hunt, none active UPnP service was found. Try with other target IPs")
         upnp_locations = list(locations)
@@ -696,6 +703,10 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
         # Retrieve the SOAP requests from the selected UPnP service
         selected_upnp = self.upnpcombo.getSelectedItem()
         print("[+] Selected UPnP service at url \"%s\"") % str(selected_upnp)
+        # Disable all step three buttons each time change the selected UPnP
+        self.intruderbutton.setEnabled(False)
+        self.LANrepeaterbutton.setEnabled(False)
+        self.LANrepeaterbutton.setEnabled(False)
         
         # Extract the built SOAP requests for the selected UPnP service
         self.all_SOAP_list = list(set(self.getAllSOAPs(selected_upnp)))
@@ -703,15 +714,17 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
         self.WAN_SOAP_list = list(set(self.getWANSOAPs(selected_upnp)))
         
         # Update the plugin UI with the retrieved UPnP profiles to analyze
-        if self.all_SOAP_list:
+        if len(self.all_SOAP_list) > 0:
             self.intruderbutton.setEnabled(True)
-            self.labelSOAPnum.setText(str(len(self.all_SOAP_list)))
-        if self.LAN_SOAP_list:
+        self.labelSOAPnum.setText(str(len(self.all_SOAP_list)))
+
+        if len(self.LAN_SOAP_list) > 0:
             self.LANrepeaterbutton.setEnabled(True)
-            self.labelLANHOSTnum.setText(str(len(self.LAN_SOAP_list)))
-        if self.WAN_SOAP_list:
+        self.labelLANHOSTnum.setText(str(len(self.LAN_SOAP_list)))
+
+        if len(self.WAN_SOAP_list) > 0:
             self.WANrepeaterbutton.setEnabled(True)
-            self.labelWANCONNECTIONnum.setText(str(len(self.WAN_SOAP_list)))
+        self.labelWANCONNECTIONnum.setText(str(len(self.WAN_SOAP_list)))
 
 
     def sendWANUPnPToRepeater(self, e=None):
