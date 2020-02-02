@@ -38,6 +38,7 @@ from java.awt.event import ActionListener
 
 
 
+
 class PyRunnable(Runnable):
     # Class used to wrap a python callable object into a Java Runnable that is 
     # suitable to be passed to various Java methods that perform callbacks
@@ -501,7 +502,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     if location_result and (location_result.group(1) in locations) == False:
                         locations.add(location_result.group(1))
             else:
-                print("[!] Unsucessfull hunt, none active UPnP service was found. Try with other target IPs")
+                print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
             upnp_locations = list(locations)
         else:
             # Note: IPv6 addresses in Host header for RFC2732 have to be enclosed between square brackets
@@ -538,7 +539,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     if location_result and (location_result.group(1) in locations) == False:
                         locations.add(location_result.group(1))
             else:
-                print("[!] Unsucessfull hunt, none active UPnP service was found. Try with other target IPs")
+                print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
             upnp_locations = list(locations)
         # Finally return the discovered locations
         return upnp_locations
@@ -555,7 +556,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
             self.upnpcombo_services.removeAllItems()
             # First check if any UPnP service was found
             if not cb_list:
-                self.upnpcombo_targets.addItem("None UPnP service found")
+                self.upnpcombo_targets.addItem("No UPnP service found")
                 return
             # Build a dict of found IPs and location urls
             for cb_url in cb_list:
@@ -617,7 +618,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     except urllib2.URLError, e:
                         print("[!] Got timeout issues when requesting %s" % url_ipv6)
                         pass
-                        #print e
                     if download_resp and download_resp.code == 200 and download_resp.msg:
                         print("[+] Successfully downloaded xml file \"%s\" ") % d_url
                         # Extract the response body
@@ -632,7 +632,10 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     ba_download_resp = self.callbacks.makeHttpRequest(d_host, int(d_port), is_https, ba_download_req)
                     if ba_download_resp:
                         download_resp = "".join(map(chr, ba_download_resp))
+                    okstatus = None
                     if download_resp:
+                    	okstatus = re.match(r"HTTP[^ ]* 200 OK", download_resp)
+                    if okstatus:
                         print("[+] Successfully downloaded xml file \"%s\" ") % d_url
                         # Extract the response body
                         splitted_resp = download_resp.split("\r\n\r\n")
@@ -656,7 +659,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
         # Check if is a Description (with location_url) or SCDP file
         if location_url:
             # Parse the Description XML file to extract the info about Services
-            base_URL_elem = re.search("<base_URL>(.*?)</base_URL>", file2parse)
+            base_URL_elem = re.search("<URLBase>(.*?)</URLBase>", file2parse)
             # Retrieve the baseURL item
             if base_URL_elem:
                 base_URL = base_URL_elem.groups()[0].rstrip('/')
@@ -684,12 +687,12 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
             action_list = re.findall("(<action>.*?)</action>", file2parse)
             # Retrieve action-name and if present the argument-name values
             for act in action_list:
-                act_name = re.search("<action><name>(.*?)</name>", act).groups()[0]
+                act_name = re.search("<action>.*?<name>(.*?)</name>", act).groups()[0]
                 arg_name = []
                 # Determine if is a Get-action or not
                 if act_name.startswith("Get"):
                     # Get-action found
-                    arg_direction = re.search("<argument><name>(.*?)</name><direction>(.*?)</direction>", act)
+                    arg_direction = re.search("<argument>.*?<name>(.*?)</name>.*?<direction>(.*?)</direction>", act)
                     if arg_direction and "in" in arg_direction.groups()[1]:
                         # Get-action with input arguments
                         arg_name.append(str(arg_direction.groups()[0]))
@@ -698,9 +701,9 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                         arg_name.append("")
                 else:
                     # Other than Get-action found
-                    arg_exists = re.search("<argument><name>(.*?)</name>", act)
+                    arg_exists = re.search("<argument>.*?<name>(.*?)</name>", act)
                     if arg_exists:
-                        arg_list = re.findall("<argument><name>(.*?)</name>", act)
+                        arg_list = re.findall("<argument>.*?<name>(.*?)</name>", act)
                         for arg in arg_list:
                             arg_name.append(arg)
                     else:
@@ -793,7 +796,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                 print("[+] Downloading the SCDP file: \"%s\"") % services_dict[s_type][1]
                 scdp_dict = self.downloadXMLfiles(scdp_list)
                 if not scdp_dict:
-                    print("[!] Warning, none UPnP service was found for location url %s") % loc_url
+                    print("[!] Warning, no UPnP service retrieved for %s" % "".join(scdp_url for scdp_url in scdp_list))
                     continue
                 for scdp_file in scdp_dict.values():
                     action_dict = self.parseXMLfile(scdp_file, None)
@@ -863,7 +866,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
         print("[+] Selected UPnP service at url \"%s\"") % str(selected_upnp)
         # Check if almost an UPnP service was detected
         if not self.getAllSOAPs(selected_upnp):
-            self.labelNoneServiceFound.setText("WARNING: none UPnP service was found for this location url")
+            self.labelNoneServiceFound.setText("WARNING: no UPnP service was found for this location url")
             return
 
         # Disable all step three buttons every time the selected UPnP changes
@@ -900,7 +903,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     port = destination.group(1).split(":")[1]
                 else:
                     port = '80'
-                ba_req = bytearray(soap_req)
+                ba_req = bytearray(soap_req, 'utf-8')
                 self.callbacks.sendToRepeater(host, int(port), False, ba_req, None)
 
 
@@ -916,7 +919,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     port = destination.group(1).split(":")[1]
                 else:
                     port = '80'
-                ba_req = bytearray(soap_req)
+                ba_req = bytearray(soap_req, 'utf-8')
                 self.callbacks.sendToRepeater(host, int(port), False, ba_req, None)
 
 
@@ -932,6 +935,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                     port = destination.group(1).split(":")[1]
                 else:
                     port = '80'           
-                ba_req = bytearray(soap_req)
+                ba_req = bytearray(soap_req, 'utf-8')
                 self.callbacks.sendToIntruder(host, int(port), False, ba_req)
 
