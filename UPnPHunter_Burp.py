@@ -692,13 +692,21 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                 # Determine if is a Get-action or not
                 if act_name.startswith("Get"):
                     # Get-action found
-                    arg_direction = re.search("<argument>.*?<name>(.*?)</name>.*?<direction>(.*?)</direction>", act)
-                    if arg_direction and "in" in arg_direction.groups()[1]:
-                        # Get-action with input arguments
-                        arg_name.append(str(arg_direction.groups()[0]))
-                    else:
-                        # Get-action without input arguments are discarded
-                        arg_name.append("")
+                    arg_direction_list= []
+                    inFound = False
+                    arg_direction_list = re.findall("<argument>.*?<name>(.*?)</name>.*?<direction>(.*?)</direction>", act)
+                    # Search direction info for each extracted argument
+                    for arg_nm, arg_direction in arg_direction_list:
+                        if arg_direction and "in" in arg_direction:
+                            # Get-action with input arguments
+                            inFound = True
+                            # If almost an input argument is found then remove all output placeholders
+                            while "" in arg_name: arg_name.remove("")
+                            arg_name.append(arg_nm)
+                        else:
+                            # Get-action without input arguments are discarded and a empty placeholder is set
+                            if not inFound and not "" in arg_name:
+                                arg_name.append("")
                 else:
                     # Other than Get-action found
                     arg_exists = re.search("<argument>.*?<name>(.*?)</name>", act)
@@ -707,8 +715,9 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):
                         for arg in arg_list:
                             arg_name.append(arg)
                     else:
-                        # Other than Get-action without any argument are discarded
-                        arg_name.append("")
+                        # Other than Get-action without any argument are discarded and a empty placeholder is set
+                        if not "" in arg_name:
+                            arg_name.append("")
                 output_dict[act_name] = arg_name
         return output_dict
 
