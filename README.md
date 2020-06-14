@@ -9,7 +9,7 @@ UPnP BHunter is a Burp Suite Extension written in Python/Jython which could be u
 UPnP BHunter provides a nice ;) three-step hunting console: 
 1. UPnP Discovery (definition of target IP address version and discovery of active UPnP via SSDP protocol)
 2. UPnP Selection (selection of the found UPnP service) 
-3. UPnP Attack (extraction of the found UPnP SOAP requests). 
+3. UPnP Attack (extraction of the found UPnP SOAP, Subscribe and Presentation requests). 
 
 The tutorial below explain, better than so many words, how to use the plugin:
 
