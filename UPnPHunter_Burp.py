@@ -858,22 +858,27 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         ctrl_URL, scpd_URL, subs_URL, pres_URL = None, None, None, None
         # First remove newlines and whitelines from the xml file
         file2parse = re.sub(r"[\r\n\s\t]*","", file_content)
-
         # Run here when is searching for presentation url in Description file
         if isPresentation:
+            # Parse the Description XML file to extract the info about Services
+            base_URL_elem = re.search("<URLBase>(.*?)</URLBase>", file2parse)
+            # Retrieve the baseURL item
+            if base_URL_elem:
+                base_URL = base_URL_elem.groups()[0].rstrip('/')
+            else:
+                url = urlparse(location_url)
+                base_URL = '%s://%s' % (url.scheme, url.netloc)
             # Extract presentationURL
-            if (re.search("<presentationURL>(.*?)</presentationURL>", file2parse)):
+            pres_m = re.search("<presentationURL>(.*?)</presentationURL>", file2parse)
+            if pres_m:
                 # Check if presentation url is a complete url or only an url path
-                if (re.search("<presentationURL>(.*?)</presentationURL>", file2parse).groups()[0]).startswith("http"):
-                        pres_URL = re.search("<presentationURL>(.*?)</presentationURL>", file2parse).groups()[0]
+                if pres_m.groups()[0].startswith("http"):
+                    pres_URL = pres_m.groups()[0]
                 else:
-                    if not (re.search("<presentationURL>(.*?)</presentationURL>", file2parse).groups()[0]).startswith("/"):
-                        pres_path = "/" + re.search("<presentationURL>(.*?)</presentationURL>", file2parse).groups()[0]
+                    if not pres_m.groups()[0].startswith("/"):
+                        pres_URL = base_URL + "/" + pres_m.groups()[0]
                     else:
-                        pres_path = re.search("<presentationURL>(.*?)</presentationURL>", file2parse).groups()[0]
-                # Build the presentation URL
-                if pres_path:
-                    pres_URL = base_URL + pres_path
+                        pres_URL = base_URL + pres_m.groups()[0]
                 # Aggregate the extracted info
                 output_dict['presentation_upnpbhunter'] = [None, None, None, pres_URL]
 
@@ -887,39 +892,47 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                 if base_URL_elem:
                     base_URL = base_URL_elem.groups()[0].rstrip('/')
                 else:
-                    url = urlparse (location_url)
+                    url = urlparse(location_url)
                     base_URL = '%s://%s' % (url.scheme, url.netloc)
                 service_list = re.findall("<service>(.*?)</service>", file2parse)
                 # Retrieve values of serviceType, controlURL, SCDPURL, eventSubURL, and presentationURL
                 for serv in service_list:
                     # Extract serviceType
                     service_type = re.search("<serviceType>(.*?)</serviceType>", serv).groups()[0]
-                    # Extract controlURL               
-                    if (re.search("<controlURL>(.*?)</controlURL>", serv)):                     
-                        if not (re.search("<controlURL>(.*?)</controlURL>", serv).groups()[0]).startswith("/"):
-                            ctrl_path = "/" + re.search("<controlURL>(.*?)</controlURL>", serv).groups()[0]
+                    # Extract controlURL
+                    ctrl_m = re.search("<controlURL>(.*?)</controlURL>", serv)        
+                    #if (re.search("<controlURL>(.*?)</controlURL>", serv)):
+                    if ctrl_m:
+                        # Check if presentation url is a complete url or only an url path
+                        if ctrl_m.groups()[0].startswith("http"):
+                            ctrl_URL = ctrl_m.groups()[0]
                         else:
-                            ctrl_path = re.search("<controlURL>(.*?)</controlURL>", serv).groups()[0]
+                            if not ctrl_m.groups()[0].startswith("/"):
+                                ctrl_URL = base_URL + "/" + ctrl_m.groups()[0]
+                            else:
+                                ctrl_URL = base_URL + ctrl_m.groups()[0]
                     # Extract SCPDURL
-                    if (re.search("<SCPDURL>(.*?)</SCPDURL>", serv)): 
-                        if not (re.search("<SCPDURL>(.*?)</SCPDURL>", serv).groups()[0]).startswith("/"):
-                            scdp_path = "/" + re.search("<SCPDURL>(.*?)</SCPDURL>", serv).groups()[0]
+                    scpd_m = re.search("<SCPDURL>(.*?)</SCPDURL>", serv)
+                    if scpd_m:
+                        # Check if presentation url is a complete url or only an url path
+                        if scpd_m.groups()[0].startswith("http"):
+                            scpd_URL = scpd_m.groups()[0]
                         else:
-                            scdp_path = re.search("<SCPDURL>(.*?)</SCPDURL>", serv).groups()[0]
+                            if not scpd_m.groups()[0].startswith("/"):
+                                scpd_URL = base_URL + "/" + scpd_m.groups()[0]
+                            else:
+                                scpd_URL = base_URL + scpd_m.groups()[0]
                     # Extract eventSubURL
-                    if (re.search("<eventSubURL>(.*?)</eventSubURL>", serv)): 
-                        if not (re.search("<eventSubURL>(.*?)</eventSubURL>", serv).groups()[0]).startswith("/"):
-                            subs_path = "/" + re.search("<eventSubURL>(.*?)</eventSubURL>", serv).groups()[0]
+                    subs_m = re.search("<eventSubURL>(.*?)</eventSubURL>", serv)
+                    if subs_m:
+                        # Check if presentation url is a complete url or only an url path
+                        if subs_m.groups()[0].startswith("http"):
+                            subs_URL = subs_m.groups()[0]
                         else:
-                            subs_path = re.search("<eventSubURL>(.*?)</eventSubURL>", serv).groups()[0]   
-
-                    # Build the ctrl, scpd and subscribe urls
-                    if ctrl_path:
-                        ctrl_URL = base_URL + ctrl_path
-                    if scdp_path:
-                        scpd_URL = base_URL + scdp_path
-                    if subs_path:
-                        subs_URL = base_URL + subs_path
+                            if not subs_m.groups()[0].startswith("/"):
+                                subs_URL = base_URL + "/" + subs_m.groups()[0]
+                            else:
+                                subs_URL = base_URL + subs_m.groups()[0]
                     # Aggregate the extracted info 
                     output_dict[service_type] = [ctrl_URL, scpd_URL, subs_URL, None]
             
@@ -992,7 +1005,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             if arg_name:
                 sfuzz.append("        <{0}>{1}</{0}>".format(arg_name, self.PLACEHOLDER))
             else:
-                # In case of Get-action or an actionwithout arguments
+                # In case of Get-action or an action without arguments
                 sfuzz.append("{0}".format(self.PLACEHOLDER))
         soap_body_fuzzable = "\r\n".join(sfuzz)
 
@@ -1426,5 +1439,6 @@ class CustomIHttpService(IHttpService):
 
     def getPort(self):
         return self._port
+
 
 
