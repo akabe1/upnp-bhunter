@@ -71,7 +71,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
     ST_ROOTDEV = "upnp:rootdevice"
     PLACEHOLDER = "FUZZ_HERE"
     SSDP_TIMEOUT = 2
-    serverloc_dict = {}
+    issues_dict = {}
 
 
 
@@ -96,22 +96,22 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
 
     def publishUpnpDetectionIssue(self):
         # Check and publish found UPnP issues
-        if self.serverloc_dict:
-            for loc_url in self.serverloc_dict:
+        if self.issues_dict:
+            for loc_url in self.issues_dict:
                 # First publish the UPnP service detected issue
                 loc_url_parsed = urlparse(loc_url)
                 protocol = loc_url_parsed.scheme.encode('ascii','ignore')
                 host = loc_url_parsed.netloc.split(":")[0].encode('ascii','ignore')
                 port = loc_url_parsed.netloc.split(":")[1]
                 path = loc_url_parsed.path.encode('ascii','ignore')
-                url = URL(protocol + "://" + host + ":" + unicode(port) + path)
+                upnp_url = URL(protocol + "://" + host + ":" + unicode(port) + path)
                 httpService = CustomIHttpService(protocol, host, int(port))
                 comment = None
                 highlight = None
-                server_id = self.serverloc_dict[loc_url]
+                server_id = self.issues_dict[loc_url]["server_id"]
                 # Create upnp detection issue
                 upnp_issue = CustomScanIssue(CustomIHttpService(protocol, host, int(port)), 
-                    url, 
+                    upnp_url, 
                     "UPnP Service Detected", 
                     "The remote host has an active UPnP service and the following server header was identified:<ul><li>"+server_id+"</li></ul>",
                     "Certain", 
@@ -134,96 +134,89 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
 
 
 
-    def publishUpnpFuntionIssues(self):
+    def publishUpnpFunctionIssues(self):
         # Check and publish the found UPnP issues
-        if self.serverloc_dict:
-            for loc_url in self.serverloc_dict:
+        if self.issues_dict:
+            for loc_url in self.issues_dict:
                 loc_url_parsed = urlparse(loc_url)
-                protocol = loc_url_parsed.scheme.encode('ascii','ignore')        
+                protocol = loc_url_parsed.scheme.encode('ascii','ignore')  
                 # The UPnP Privileged Profile issue
                 if self.LAN_SOAP_list or self.WAN_SOAP_list:
-                    if not self.WAN_SOAP_list:
-                        # First item on LAN list is sufficient to create the affected url
-                        igd_m = re.match(r'[\w]* (/.*) HTTP/\d\.\d[\r]?\n[^H]*Host: (.*?)[\r]?\n', self.LAN_SOAP_list[0])
-                    else:
-                        # First item on WAN list is sufficient to create the affected url
-                        igd_m = re.match(r'[\w]* (/.*) HTTP/\d\.\d[\r]?\n[^H]*Host: (.*?)[\r]?\n', self.WAN_SOAP_list[0])
-                    if igd_m:
-                        igd_host = igd_m.group(2).split(":")[0]
-                        igd_port = igd_m.group(2).split(":")[1]
-                        igd_path = igd_m.group(1)
-                        igd_url = URL(protocol + "://" + igd_host + ":" + unicode(igd_port) + igd_path)
-                        # Create upnp privileged IGD profile issue                        
-                        igd_issue = CustomScanIssue(CustomIHttpService(protocol, igd_host, int(igd_port)), 
-                        igd_url, 
-                        "UPnP Privileged IGD Profile Detected", 
-                        "The UPnP service exposes some of the IGD privileged profiles: \"LANHostConfigManagement\", \"WANIPConnection\" or \"WANPPPConnection\".",
-                        "Certain", 
-                        "Information",
-                        "The UPnP profiles \"LANHostConfigManagement\", \"WANIPConnection\" and \"WANPPPConnection\" provide some interesting IGD features that allow to change routing settings of UPnP devices.<br><br> \
-                        IGD profiles have to be carefully secured, in order to avoid abuses which could lead to unauthorized actions, as for example expose internal hosts to external networks bypassing firewall restrictions.<br><br> \
-                        References:<br><ul><li><a href=\"http://www.upnp-hacks.org/\">http://www.upnp-hacks.org/</a></li><li><a href=\"https://www.blackhat.com/presentations/bh-usa-08/Squire/BH_US_08_Squire_A_Fox_in_the_Hen_House%20White%20Paper.pdf\"> \
-                        https://www.blackhat.com/presentations/bh-usa-08/Squire/BH_US_08_Squire_A_Fox_in_the_Hen_House%20White%20Paper.pdf</a></li></ul> ",
-                        "Disable UPnP service if it is not a business or technical requirement. The UPnP sensitive features as IGD profiles must be protected from unauthorized accesses and abuses."
-                        ) 
-                        # Add the new issue on Burp dashboard
-                        self.callbacks.addScanIssue(igd_issue)
+                    url = self.issues_dict[loc_url]["ctrl_URL"]
+                    url_parsed = urlparse(url)
+                    protocol = url_parsed.scheme.encode('ascii','ignore')
+                    host = url_parsed.netloc.split(":")[0].encode('ascii','ignore')
+                    port = url_parsed.netloc.split(":")[1]
+                    path = url_parsed.path.encode('ascii','ignore')
+                    igd_url = URL(protocol + "://" + host + ":" + unicode(port) + path) 
+                    # Create upnp privileged IGD profile issue                        
+                    igd_issue = CustomScanIssue(CustomIHttpService(protocol, host, int(port)), 
+                    igd_url, 
+                    "UPnP Privileged IGD Profile Detected", 
+                    "The UPnP service exposes some of the IGD privileged profiles: \"LANHostConfigManagement\", \"WANIPConnection\" or \"WANPPPConnection\".",
+                    "Certain", 
+                    "Information",
+                    "The UPnP profiles \"LANHostConfigManagement\", \"WANIPConnection\" and \"WANPPPConnection\" provide some interesting IGD features that allow to change routing settings of UPnP devices.<br><br> \
+                    IGD profiles have to be carefully secured, in order to avoid abuses which could lead to unauthorized actions, as for example expose internal hosts to external networks bypassing firewall restrictions.<br><br> \
+                    References:<br><ul><li><a href=\"http://www.upnp-hacks.org/\">http://www.upnp-hacks.org/</a></li><li><a href=\"https://www.blackhat.com/presentations/bh-usa-08/Squire/BH_US_08_Squire_A_Fox_in_the_Hen_House%20White%20Paper.pdf\"> \
+                    https://www.blackhat.com/presentations/bh-usa-08/Squire/BH_US_08_Squire_A_Fox_in_the_Hen_House%20White%20Paper.pdf</a></li></ul> ",
+                    "Disable UPnP service if it is not a business or technical requirement. The UPnP sensitive features as IGD profiles must be protected from unauthorized accesses and abuses."
+                    ) 
+                    # Add the new issue on Burp dashboard
+                    self.callbacks.addScanIssue(igd_issue)
 
                 # The UPnP Subscribe issue
                 if self.Sub_list:
-                    # First item on Sub list is sufficient to create the affected url 
-                    sub_m = re.match(r'[\w]* (/.*) HTTP/\d\.\d[\r]?\n[^H]*Host: (.*?)[\r]?\n', self.Sub_list[0])
-                    if sub_m:
-                        sub_host = sub_m.group(2).split(":")[0]
-                        if ":" in sub_m.group(2):                        
-                            sub_port = sub_m.group(2).split(":")[1]
-                        else:
-                            sub_port = "80"
-                        sub_path = sub_m.group(1)
-                        sub_url = URL(protocol + "://" + sub_host + ":" + unicode(sub_port) + sub_path)
-                        # Create upnp subscribe issue
-                        sub_issue = CustomScanIssue(CustomIHttpService(protocol, sub_host, int(sub_port)), 
-                        sub_url, 
-                        "UPnP Subscribe Method Detected", 
-                        "The UPnP service allows Event Subscription.",
-                        "Certain", 
-                        "Information",
-                        "The UPnP method \"Subscribe\" allows to receive event messages from UPnP devices when some state variables are updated, to an HTTP listening host specified by the subscriber.<br><br> \
-                        This service should be carefully secured in order to avoid abuses which could lead to unauthorized actions, as for example send event messages to arbitrary destinations for DDoS attacks.<br><br> \
-                        References:<br><ul><li><a href=\"http://www.upnp-hacks.org/sane2006-paper.pdf\">http://www.upnp-hacks.org/sane2006-paper.pdf</a></li><li><a href=\"https://resources.infosecinstitute.com/ddos-upnp-devices/\"> \
-                        https://resources.infosecinstitute.com/ddos-upnp-devices/</a></li><li><a href=\"https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-12695\">https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-12695</a></li></ul>",
-                        "Disable UPnP service if it is not a business or technical requirement. The UPnP methods as Subscribe must be protected from unauthorized accesses and abuses."
-                        ) 
-                        # Add the new issue on Burp dashboard
-                        self.callbacks.addScanIssue(sub_issue)
+                    url = self.issues_dict[loc_url]["subs_URL"]
+                    url_parsed = urlparse(url)
+                    protocol = url_parsed.scheme.encode('ascii','ignore')
+                    host = url_parsed.netloc.split(":")[0].encode('ascii','ignore')
+                    port = url_parsed.netloc.split(":")[1]
+                    path = url_parsed.path.encode('ascii','ignore')
+                    sub_url = URL(protocol + "://" + host + ":" + unicode(port) + path) 
+                    # Create upnp subscribe issue
+                    sub_issue = CustomScanIssue(CustomIHttpService(protocol, host, int(port)), 
+                    sub_url, 
+                    "UPnP Subscribe Method Detected", 
+                    "The UPnP service allows Event Subscription.",
+                    "Certain", 
+                    "Information",
+                    "The UPnP method \"Subscribe\" allows to receive event messages from UPnP devices when some state variables are updated, to an HTTP listening host specified by the subscriber.<br><br> \
+                    This service should be carefully secured in order to avoid abuses which could lead to unauthorized actions, as for example send event messages to arbitrary destinations for DDoS attacks.<br><br> \
+                    References:<br><ul><li><a href=\"http://www.upnp-hacks.org/sane2006-paper.pdf\">http://www.upnp-hacks.org/sane2006-paper.pdf</a></li><li><a href=\"https://resources.infosecinstitute.com/ddos-upnp-devices/\"> \
+                    https://resources.infosecinstitute.com/ddos-upnp-devices/</a></li><li><a href=\"https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-12695\">https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-12695</a></li></ul>",
+                    "Disable UPnP service if it is not a business or technical requirement. The UPnP methods as Subscribe must be protected from unauthorized accesses and abuses."
+                    ) 
+                    # Add the new issue on Burp dashboard
+                    self.callbacks.addScanIssue(sub_issue)
 
                 # The UPnP Presentation issue
                 if self.Pres_list:
-                    # First item on Pres list is sufficient to create the affected url 
-                    pres_m = re.match(r'[\w]* (/.*) HTTP/\d\.\d[\r]?\n[^H]*Host: (.*?)[\r]?\n', self.Pres_list[0])
-                    if pres_m:
-                        pres_host = pres_m.group(2).split(":")[0]
-                        if ":" in pres_m.group(2):
-                            pres_port = pres_m.group(2).split(":")[1]
-                        else:
-                            pres_port = 80
-                        pres_path = pres_m.group(1)
-                        pres_url = URL(protocol + "://" + pres_host + ":" + unicode(pres_port) + pres_path)
-                        # Create upnp presentation issue
-                        pres_issue = CustomScanIssue(CustomIHttpService(protocol, pres_host, int(pres_port)), 
-                        pres_url, 
-                        "UPnP Presentation Method Detected", 
-                        "The UPnP service exposes a Presentation web page.",
-                        "Certain", 
-                        "Information",
-                        "The UPnP method \"Presentation\" allows UPnP devices to expose an web page, depending on the vendor specific implementations this presentation page could allow users to control the device and view its status.<br><br> \
-                        This service should be carefully secured in order to avoid abuses which could lead to unauthorized actions.<br><br> \
-                        References:<br><ul><li><a href=\"http://www.upnp-hacks.org/\">http://www.upnp-hacks.org/</a></li></li><li><a href=\"https://cwe.mitre.org/data/definitions/200.html\">https://cwe.mitre.org/data/definitions/200.html</a></li></ul>",
-                        "Disable UPnP service if it is not a business or technical requirement. The UPnP methods as Presentation must be protected from unauthorized accesses and abuses."
-                        ) 
-                        # Add the new issue on Burp dashboard
-                        self.callbacks.addScanIssue(pres_issue)
-
+                    url = self.issues_dict[loc_url]["pres_URL"]
+                    url_parsed = urlparse(url)
+                    protocol = url_parsed.scheme.encode('ascii','ignore')
+                    host = url_parsed.netloc.split(":")[0].encode('ascii','ignore')
+                    if ":" in url_parsed.netloc:
+                        port = url_parsed.netloc.split(":")[1]
+                    else:
+                        port = '80'
+                    path = url_parsed.path.encode('ascii','ignore')
+                    pres_url = URL(protocol + "://" + host + ":" + unicode(port) + path) 
+                    # Create upnp presentation issue
+                    pres_issue = CustomScanIssue(CustomIHttpService(protocol, host, int(port)), 
+                    pres_url, 
+                    "UPnP Presentation Method Detected", 
+                    "The UPnP service exposes a Presentation web page.",
+                    "Certain", 
+                    "Information",
+                    "The UPnP method \"Presentation\" allows UPnP devices to expose an web page, depending on the vendor specific implementations this presentation page could allow users to control the device and view its status.<br><br> \
+                    This service should be carefully secured in order to avoid abuses which could lead to unauthorized actions.<br><br> \
+                    References:<br><ul><li><a href=\"http://www.upnp-hacks.org/\">http://www.upnp-hacks.org/</a></li></li><li><a href=\"https://cwe.mitre.org/data/definitions/200.html\">https://cwe.mitre.org/data/definitions/200.html</a></li></ul>",
+                    "Disable UPnP service if it is not a business or technical requirement. The UPnP methods as Presentation must be protected from unauthorized accesses and abuses."
+                    ) 
+                    # Add the new issue on Burp dashboard
+                    self.callbacks.addScanIssue(pres_issue)
+        
         return
         
 
@@ -694,10 +687,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                     if location_result and (location_result.group(1) in locations) == False:
                         locations.add(location_result.group(1))
                         if server_result:
-                            self.serverloc_dict[location_result.group(1)] = server_result.group(1)
-                    
-                    #if server_result and not self.server_id:
-                    #    self.server_id = server_result.group(1)
+                            self.issues_dict[location_result.group(1)] = {}
+                            self.issues_dict[location_result.group(1)]["server_id"] = server_result.group(1)
             else:
                 print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
             upnp_locations = list(locations)
@@ -778,7 +769,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.upnpcombo_services.removeAllItems()
             for scope_url in self.scope_dict[selected_ip]:
                 self.upnpcombo_services.addItem(scope_url)
-
             # Select the first element in the combobox by default
             self.upnpcombo_services.setSelectedIndex(0)
             self.confirmbutton.setEnabled(True)
@@ -833,7 +823,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                         download_resp = "".join(map(chr, ba_download_resp))
                     okstatus = None
                     if download_resp:
-                    	okstatus = re.match(r"HTTP[^ ]* 200 OK", download_resp)
+                        okstatus = re.match(r"HTTP[^ ]* 200 OK", download_resp)
                     if okstatus:
                         print("[+] Successfully downloaded xml file \"%s\" ") % d_url
                         # Extract the response body
@@ -858,8 +848,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         ctrl_URL, scpd_URL, subs_URL, pres_URL = None, None, None, None
         # First remove newlines and whitelines from the xml file
         file2parse = re.sub(r"[\r\n\s\t]*","", file_content)
-        # Run here when is searching for presentation url in Description file
-        if isPresentation:
+        # Run here when parsing Description files
+        if location_url:
             # Parse the Description XML file to extract the info about Services
             base_URL_elem = re.search("<URLBase>(.*?)</URLBase>", file2parse)
             # Retrieve the baseURL item
@@ -868,32 +858,25 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             else:
                 url = urlparse(location_url)
                 base_URL = '%s://%s' % (url.scheme, url.netloc)
-            # Extract presentationURL
-            pres_m = re.search("<presentationURL>(.*?)</presentationURL>", file2parse)
-            if pres_m:
-                # Check if presentation url is a complete url or only an url path
-                if pres_m.groups()[0].startswith("http"):
-                    pres_URL = pres_m.groups()[0]
-                else:
-                    if not pres_m.groups()[0].startswith("/"):
-                        pres_URL = base_URL + "/" + pres_m.groups()[0]
-                    else:
-                        pres_URL = base_URL + pres_m.groups()[0]
-                # Aggregate the extracted info
-                output_dict['presentation_upnpbhunter'] = [None, None, None, pres_URL]
 
-        # Run here when is not searching for presentation url
-        else:
+            # Run here when searching presentation url in Description file
+            if isPresentation:
+                # Extract presentationURL
+                pres_m = re.search("<presentationURL>(.*?)</presentationURL>", file2parse)
+                if pres_m:
+                    # Check if presentation url is a complete url or only an url path
+                    if pres_m.groups()[0].startswith("http"):
+                        pres_URL = pres_m.groups()[0]
+                    else:
+                        if not pres_m.groups()[0].startswith("/"):
+                            pres_URL = base_URL + "/" + pres_m.groups()[0]
+                        else:
+                            pres_URL = base_URL + pres_m.groups()[0]
+                    # Aggregate the extracted info
+                    output_dict['presentation_upnpbhunter'] = [None, None, None, pres_URL]
+
             # Run here when searching service urls in Description file
-            if location_url:
-                # Parse the Description XML file to extract the info about Services
-                base_URL_elem = re.search("<URLBase>(.*?)</URLBase>", file2parse)
-                # Retrieve the baseURL item
-                if base_URL_elem:
-                    base_URL = base_URL_elem.groups()[0].rstrip('/')
-                else:
-                    url = urlparse(location_url)
-                    base_URL = '%s://%s' % (url.scheme, url.netloc)
+            else:
                 service_list = re.findall("<service>(.*?)</service>", file2parse)
                 # Retrieve values of serviceType, controlURL, SCDPURL, eventSubURL, and presentationURL
                 for serv in service_list:
@@ -901,7 +884,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                     service_type = re.search("<serviceType>(.*?)</serviceType>", serv).groups()[0]
                     # Extract controlURL
                     ctrl_m = re.search("<controlURL>(.*?)</controlURL>", serv)        
-                    #if (re.search("<controlURL>(.*?)</controlURL>", serv)):
                     if ctrl_m:
                         # Check if presentation url is a complete url or only an url path
                         if ctrl_m.groups()[0].startswith("http"):
@@ -936,45 +918,46 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                     # Aggregate the extracted info 
                     output_dict[service_type] = [ctrl_URL, scpd_URL, subs_URL, None]
             
-            # Run here when is enumerating actions in SCDP file
-            else:
-                # Parse the SCDP xml file to extract the info about Actions
-                action_list = re.findall("(<action>.*?)</action>", file2parse)
-                # Retrieve action-name and if present the argument-name values
-                for act in action_list:
-                    act_name = re.search("<action>.*?<name>(.*?)</name>", act).groups()[0]
-                    arg_name = []
-                    # Determine if is a Get-action or not
-                    if act_name.startswith("Get"):
-                        # Get-action found
-                        arg_direction_list= []
-                        inFound = False
-                        arg_direction_list = re.findall("<argument>.*?<name>(.*?)</name>.*?<direction>(.*?)</direction>", act)
-                        # Search direction info for each extracted argument
-                        for arg_nm, arg_direction in arg_direction_list:
-                            if arg_direction and "in" in arg_direction:
-                                # Get-action with input arguments
-                                inFound = True
-                                # If at leats an input argument is found then remove all output placeholders
-                                while "" in arg_name: arg_name.remove("")
-                                arg_name.append(arg_nm)
-                            else:
-                                # Get-action without input arguments are discarded and a empty placeholder is set
-                                if not inFound and not "" in arg_name:
-                                    arg_name.append("")
-                    else:
-                        # Other than Get-action found
-                        arg_exists = re.search("<argument>.*?<name>(.*?)</name>", act)
-                        if arg_exists:
-                            arg_list = re.findall("<argument>.*?<name>(.*?)</name>", act)
-                            for arg in arg_list:
-                                arg_name.append(arg)
+        # Run here when parsing SCDP files
+        else:
+            # Parse the SCDP xml file to extract the info about Actions
+            action_list = re.findall("(<action>.*?)</action>", file2parse)
+            # Retrieve action-name and if present the argument-name values
+            for act in action_list:
+                act_name = re.search("<action>.*?<name>(.*?)</name>", act).groups()[0]
+                arg_name = []
+                # Determine if is a Get-action or not
+                if act_name.startswith("Get"):
+                    # Get-action found
+                    arg_direction_list= []
+                    inFound = False
+                    arg_direction_list = re.findall("<argument>.*?<name>(.*?)</name>.*?<direction>(.*?)</direction>", act)
+                    # Search direction info for each extracted argument
+                    for arg_nm, arg_direction in arg_direction_list:
+                        if arg_direction and "in" in arg_direction:
+                            # Get-action with input arguments
+                            inFound = True
+                            # If at leats an input argument is found then remove all output placeholders
+                            while "" in arg_name: arg_name.remove("")
+                            arg_name.append(arg_nm)
                         else:
-                            # Other than Get-action without any argument are discarded and a empty placeholder is set
-                            if not "" in arg_name:
+                            # Get-action without input arguments are discarded and a empty placeholder is set
+                            if not inFound and not "" in arg_name:
                                 arg_name.append("")
-                    output_dict[act_name] = arg_name
+                else:
+                    # Other than Get-action found
+                    arg_exists = re.search("<argument>.*?<name>(.*?)</name>", act)
+                    if arg_exists:
+                        arg_list = re.findall("<argument>.*?<name>(.*?)</name>", act)
+                        for arg in arg_list:
+                            arg_name.append(arg)
+                    else:
+                        # Other than Get-action without any argument are discarded and a empty placeholder is set
+                        if not "" in arg_name:
+                            arg_name.append("")
+                output_dict[act_name] = arg_name
         return output_dict
+
 
 
 
@@ -1057,6 +1040,9 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             skip_LAN = True
             skip_WAN = True
             for s_type in services_dict:
+                # Build the issues dictionary
+                self.issues_dict[loc_url]["ctrl_URL"] = services_dict[s_type][0]
+                #self.issues_dict[loc_url]["scdp_URL"] = services_dict[s_type][1]
                 # Build the soap requests
                 scdp_list = []
                 if s_type != 'presentation_upnpbhunter':
@@ -1136,6 +1122,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             services_dict = self.parseXMLfile(loc_file, loc_url, False)
             subs_reqs = []
             for s_type in services_dict:
+                # Build the issues dictionary
+                self.issues_dict[loc_url]["subs_URL"] = services_dict[s_type][2]
                 # Build All the UPnP subscribe requests
                 if s_type != 'presentation_upnpbhunter':
                     if services_dict[s_type][2]:
@@ -1178,8 +1166,10 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             services_dict = self.parseXMLfile(loc_file, loc_url, True)
             pres_reqs = []
             # Build the UPnP presentation request
-            if services_dict['presentation_upnpbhunter']:
-                    pres_reqs.append(self.presentationReqBuilder(services_dict['presentation_upnpbhunter'][3]))
+            if services_dict["presentation_upnpbhunter"]:
+                # Build the issues dictionary
+                self.issues_dict[loc_url]["pres_URL"] = services_dict["presentation_upnpbhunter"][3]
+                pres_reqs.append(self.presentationReqBuilder(services_dict["presentation_upnpbhunter"][3]))
             if pres_reqs:
                 pres_req_dict[loc_url] = pres_reqs
         return pres_req_dict
@@ -1245,7 +1235,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         selected_upnp = self.upnpcombo_services.getSelectedItem()
         print("[+] Selected UPnP service at url \"%s\"") % str(selected_upnp)
         # Check if almost an UPnP service was detected
-        if not self.getAllSOAPs(selected_upnp):
+        if not self.getAllSOAPs(selected_upnp) and not self.getSubscribes and not getPresentations:
             self.labelNoneServiceFound.setText("WARNING: no UPnP service was found for this location url")
             return
 
@@ -1264,7 +1254,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.Pres_list = list(set(self.getPresentations(selected_upnp)))
 
         # Publish the found UPnP function issues
-        self.publishUpnpFuntionIssues()
+        self.publishUpnpFunctionIssues()
         
         # Update the plugin UI with the retrieved UPnP profiles to analyze
         if len(self.all_SOAP_list) > 0:
@@ -1439,6 +1429,4 @@ class CustomIHttpService(IHttpService):
 
     def getPort(self):
         return self._port
-
-
 
