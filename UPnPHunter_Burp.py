@@ -844,7 +844,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         service_list = []
         action_list = []
         arg_list = []
-        ctrl_path, scdp_path, subs_path, pres_path = "", "", "", ""
         ctrl_URL, scpd_URL, subs_URL, pres_URL = None, None, None, None
         # First remove newlines and whitelines from the xml file
         file2parse = re.sub(r"[\r\n\s\t]*","", file_content)
