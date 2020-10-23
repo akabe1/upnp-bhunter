@@ -1120,13 +1120,14 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         for loc_url, loc_file in discovery_files_dict.iteritems():
             services_dict = self.parseXMLfile(loc_file, loc_url, False)
             subs_reqs = []
-            for s_type in services_dict:
-                # Build the issues dictionary
-                self.issues_dict[loc_url]["subs_URL"] = services_dict[s_type][2]
-                # Build All the UPnP subscribe requests
-                if s_type != 'presentation_upnpbhunter':
-                    if services_dict[s_type][2]:
-                        subs_reqs.append(self.subscribeReqBuilder(services_dict[s_type][2]))
+            if services_dict:
+                for s_type in services_dict:
+                    # Build the issues dictionary
+                    self.issues_dict[loc_url]["subs_URL"] = services_dict[s_type][2]
+                    # Build All the UPnP subscribe requests
+                    if s_type != 'presentation_upnpbhunter':
+                        if services_dict[s_type][2]:
+                            subs_reqs.append(self.subscribeReqBuilder(services_dict[s_type][2]))
             if subs_reqs:
                 subs_req_dict[loc_url] = subs_reqs
         return subs_req_dict
@@ -1165,7 +1166,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             services_dict = self.parseXMLfile(loc_file, loc_url, True)
             pres_reqs = []
             # Build the UPnP presentation request
-            if services_dict["presentation_upnpbhunter"]:
+            if services_dict and services_dict["presentation_upnpbhunter"]:
                 # Build the issues dictionary
                 self.issues_dict[loc_url]["pres_URL"] = services_dict["presentation_upnpbhunter"][3]
                 pres_reqs.append(self.presentationReqBuilder(services_dict["presentation_upnpbhunter"][3]))
@@ -1428,4 +1429,3 @@ class CustomIHttpService(IHttpService):
 
     def getPort(self):
         return self._port
-
