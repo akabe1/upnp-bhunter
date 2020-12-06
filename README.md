@@ -5,6 +5,11 @@ UPnP BHunter
 UPnP BHunter is a Burp Suite Extension written in Python/Jython which could be useful to find active UPnP services/devices and extract the related SOAP, Subscribe and Presentation requests (IPv4 and IPv6 are supported), then analyze them using any of the various Burp tools (i.e. Intruder, Repeater).
 
 
+# Installation
+After downloaded the UPnP BHunter python file, start Burp Suite and click at the Extender tab on Add. Then choose the UPnP BHunter python file to install the extension.
+Alternatively is possible to install it from official Burp App Store.
+
+
 # Usage
 UPnP BHunter provides a nice ;) three-step hunting console: 
 1. UPnP Discovery (definition of target IP address version and discovery of active UPnP via SSDP protocol)
