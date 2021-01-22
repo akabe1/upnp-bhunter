@@ -2,11 +2,11 @@ Uuid: 055bd2a0f5104c2a907c1af624770eeb
 ExtensionType: 2
 Name: UPnP Hunter
 RepoName: upnp-hunter
-ScreenVersion: 2.0
-SerialVersion: 2
+ScreenVersion: 2.1
+SerialVersion: 3
 MinPlatformVersion: 0
 ProOnly: False
 Author: Maurizio Siddu
 ShortDescription: This extension finds active UPnP services/devices and extracts the related SOAP requests (IPv4 and IPv6 are supported), it then analyzes them using various Burp tools
 EntryPoint: UPnPHunter_Burp.py
-BuildCommand: rm *.gif
+BuildCommand: 
