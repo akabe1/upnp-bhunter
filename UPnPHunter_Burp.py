@@ -59,8 +59,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
     # Define the global variables for the burp plugin
     EXTENSION_NAME = "UPnP BHunter"
     ipv4_selected = True
-    all_SOAPs, LAN_SOAPs, WAN_SOAPs, all_Subs, all_Pres = {}, {}, {}, {}, {}
-    all_SOAP_list, LAN_SOAP_list, WAN_SOAP_list, Sub_list, Pres_list = [], [], [], [], []
+    all_SOAPs, LAN_SOAPs, WAN_SOAPs, AUTH_SOAPs, all_Subs, all_Pres = {}, {}, {}, {}, {}, {}
+    all_SOAP_list, LAN_SOAP_list, WAN_SOAP_list, AUTH_SOAP_list, Sub_list, Pres_list = [], [], [], [], [], []
     STOP_THREAD = False
     scope_dict = {}
     #Some  SSDP m-search parameters are based upon "UPnP Device Architecture v2.0"
@@ -257,11 +257,13 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.labelip = JLabel("IP list")
         self.labelLANHOST = JLabel("Send the interesting LANHostConfigManagement SOAP requests     ")
         self.labelWANCONNECTION = JLabel("Send the interesting WANIP/PPPConnection SOAP requests     ")
+        self.labelAUTH = JLabel("Send the AUTH SOAP requests     ")
         self.labelSubscribe = JLabel("Send the Subscribe requests     ")
         self.labelPresentation = JLabel("Send the Presentation requests     ")
         self.labelSOAPnum = JLabel("0")
         self.labelLANHOSTnum = JLabel("0")
         self.labelWANCONNECTIONnum = JLabel("0")
+        self.labelAUTHnum = JLabel("0")
         self.labelSubnum = JLabel("0")
         self.labelPresnum = JLabel("0")
         self.labelNoneServiceFound = JLabel("  ")
@@ -286,6 +288,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.intruderbutton = JButton("to Intruder", actionPerformed=self.sendUPnPToIntruder)
         self.LANrepeaterbutton = JButton("to Repeater", actionPerformed=self.sendLANUPnPToRepeater)
         self.WANrepeaterbutton = JButton("to Repeater", actionPerformed=self.sendWANUPnPToRepeater)
+        self.AUTHrepeaterbutton = JButton("to Repeater", actionPerformed=self.sendAUTHUPnPToRepeater)
         self.Subrepeaterbutton = JButton("to Repeater", actionPerformed=self.sendSubUPnPToRepeater)
         self.Presrepeaterbutton = JButton("to Repeater", actionPerformed=self.sendPresUPnPToRepeater)
 
@@ -293,6 +296,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.intruderbutton.setEnabled(False)
         self.LANrepeaterbutton.setEnabled(False)
         self.WANrepeaterbutton.setEnabled(False)
+        self.AUTHrepeaterbutton.setEnabled(False)
         self.Subrepeaterbutton.setEnabled(False)
         self.Presrepeaterbutton.setEnabled(False)        
 
@@ -396,6 +400,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         firstcolumn.addComponent(self.label_step3, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)
         firstcolumn.addComponent(self.labelLANHOST, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)
         firstcolumn.addComponent(self.labelWANCONNECTION, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)
+        firstcolumn.addComponent(self.labelAUTH, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)
         firstcolumn.addComponent(self.labelSubscribe, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)
         firstcolumn.addComponent(self.labelPresentation, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)
 
@@ -403,6 +408,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         secondcolumn.addComponent(self.labelSOAPnum)
         secondcolumn.addComponent(self.labelLANHOSTnum)
         secondcolumn.addComponent(self.labelWANCONNECTIONnum)
+        secondcolumn.addComponent(self.labelAUTHnum)
         secondcolumn.addComponent(self.labelSubnum)
         secondcolumn.addComponent(self.labelPresnum)
 
@@ -410,6 +416,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         thirdcolumn.addComponent(self.intruderbutton)
         thirdcolumn.addComponent(self.LANrepeaterbutton)
         thirdcolumn.addComponent(self.WANrepeaterbutton)
+        thirdcolumn.addComponent(self.AUTHrepeaterbutton)
         thirdcolumn.addComponent(self.Subrepeaterbutton)
         thirdcolumn.addComponent(self.Presrepeaterbutton)
 
@@ -430,19 +437,24 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         thirdrow.addComponent(self.labelWANCONNECTIONnum) 
         thirdrow.addComponent(self.WANrepeaterbutton)
         fourthrow = underlayout.createParallelGroup()
-        fourthrow.addComponent(self.labelSubscribe, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)        
-        fourthrow.addComponent(self.labelSubnum) 
-        fourthrow.addComponent(self.Subrepeaterbutton)
+        fourthrow.addComponent(self.labelAUTH, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)        
+        fourthrow.addComponent(self.labelAUTHnum) 
+        fourthrow.addComponent(self.AUTHrepeaterbutton)
         fifthrow = underlayout.createParallelGroup()
-        fifthrow.addComponent(self.labelPresentation, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)        
-        fifthrow.addComponent(self.labelPresnum) 
-        fifthrow.addComponent(self.Presrepeaterbutton)
+        fifthrow.addComponent(self.labelSubscribe, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)        
+        fifthrow.addComponent(self.labelSubnum) 
+        fifthrow.addComponent(self.Subrepeaterbutton)
+        sixthrow = underlayout.createParallelGroup()
+        sixthrow.addComponent(self.labelPresentation, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE, GroupLayout.PREFERRED_SIZE)        
+        sixthrow.addComponent(self.labelPresnum) 
+        sixthrow.addComponent(self.Presrepeaterbutton)
 
         top2bottom.addGroup(firstrow)
         top2bottom.addGroup(secondrow)
         top2bottom.addGroup(thirdrow)
         top2bottom.addGroup(fourthrow)
         top2bottom.addGroup(fifthrow)
+        top2bottom.addGroup(sixthrow)
 
         underlayout.setHorizontalGroup(left2right)
         underlayout.setVerticalGroup (top2bottom)
@@ -507,8 +519,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
 
     def clearAll(self, e=None):
         # Reset all data of the plugin
-        self.all_SOAPs, self.LAN_SOAPs, self.WAN_SOAPs, self.all_Subs, self.all_Pres = {}, {}, {}, {}, {}
-        self.all_SOAP_list, self.LAN_SOAP_list, self.WAN_SOAP_list, self.Sub_list, self.Pres_list = [], [], [], [], []
+        self.all_SOAPs, self.LAN_SOAPs, self.WAN_SOAPs, self.AUTH_SOAPs, self.all_Subs, self.all_Pres = {}, {}, {}, {}, {}, {}
+        self.all_SOAP_list, self.LAN_SOAP_list, self.WAN_SOAP_list, self.AUTH_SOAP_list, self.Sub_list, self.Pres_list = [], [], [], [], [], []
         self.progressbar.setString("Ready")
         self.progressbar.setValue(0)
         self.upnpcombo_targets.removeAllItems()
@@ -522,6 +534,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.labelLANHOSTnum.setText("0")
         self.WANrepeaterbutton.setEnabled(False)
         self.labelWANCONNECTIONnum.setText("0")
+        self.AUTHrepeaterbutton.setEnabled(False)
+        self.labelAUTHnum.setText("0")
         self.Subrepeaterbutton.setEnabled(False)
         self.labelSubnum.setText("0")
         self.Presrepeaterbutton.setEnabled(False)
@@ -537,8 +551,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         # Starting the UPnP hunt
         def startHunting_run():
             # Initialize the internal parameters every time the start-discovery button is clicked
-            self.all_SOAPs, self.LAN_SOAPs, self.WAN_SOAPs, self.all_Subs, self.all_Pres = {}, {}, {}, {}, {}
-            self.all_SOAP_list, self.LAN_SOAP_list, self.WAN_SOAP_list, self.Sub_list, self.Pres_list = [], [], [], [], []
+            self.all_SOAPs, self.LAN_SOAPs, self.WAN_SOAPs, self.AUTH_SOAPs, self.all_Subs, self.all_Pres = {}, {}, {}, {}, {}, {}
+            self.all_SOAP_list, self.LAN_SOAP_list, self.WAN_SOAP_list, self.AUTH_SOAP_list, self.Sub_list, self.Pres_list = [], [], [], [], [], []
             found_loc = []
             self.labelNoneServiceFound.setText(" ")
             self.intruderbutton.setEnabled(False)
@@ -547,6 +561,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.labelLANHOSTnum.setText("0")
             self.WANrepeaterbutton.setEnabled(False)
             self.labelWANCONNECTIONnum.setText("0")
+            self.AUTHrepeaterbutton.setEnabled(False)
+            self.labelAUTHnum.setText("0")
             self.Subrepeaterbutton.setEnabled(False)
             self.labelSubnum.setText("0")
             self.Presrepeaterbutton.setEnabled(False)
@@ -567,7 +583,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.progressbar.setValue(40)
             discovery_files = self.downloadXMLfiles(found_loc)
             self.progressbar.setValue(60)
-            self.all_SOAPs,self.LAN_SOAPs,self.WAN_SOAPs = self.buildSOAPs(discovery_files)
+            self.all_SOAPs,self.LAN_SOAPs,self.WAN_SOAPs,self.AUTH_SOAPs = self.buildSOAPs(discovery_files)
+            print("aaaaaaaaaaaaaaaa")
             self.all_Subs = self.buildSubscribes(discovery_files)
             self.all_Pres = self.buildPresentations(discovery_files)
             self.progressbar.setValue(80)
@@ -1032,12 +1049,13 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         # Retrieve all SOAP requests of the discovered UPnP services
         action_dict = {}
         scdp_dict = {}
-        soap_reqs_dict, LAN_reqs_dict, WAN_reqs_dict = {}, {}, {}
+        soap_reqs_dict, LAN_reqs_dict, WAN_reqs_dict, AUTH_reqs_dict = {}, {}, {}, {}
         for loc_url, loc_file in discovery_files_dict.iteritems():
             services_dict = self.parseXMLfile(loc_file, loc_url, False)
-            all_soap_reqs, LAN_soap_reqs, WAN_soap_reqs = [], [], []
+            all_soap_reqs, LAN_soap_reqs, WAN_soap_reqs, AUTH_sopa_reqs = [], [], [], []
             skip_LAN = True
             skip_WAN = True
+            skip_AUTH = True
             for s_type in services_dict:
                 # Build the issues dictionary
                 self.issues_dict[loc_url]["ctrl_URL"] = services_dict[s_type][0]
@@ -1063,10 +1081,15 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                     for ac_name in action_dict:
                         LAN_soap_reqs.append(self.soapReqBuilder(s_type, services_dict[s_type][0], ac_name, action_dict[ac_name]))
                 # Build only the WAN UPnP soap requests
-                if "WANIPConnection" in s_type or "WANPPPConnection" in s_type:
+                if "WANIPConnection" in s_type or "WANPPPConnection" in s_type or "WANIPv6FirewallControl" in s_type:
                     skip_WAN = False
                     for ac_name in action_dict:
                         WAN_soap_reqs.append(self.soapReqBuilder(s_type, services_dict[s_type][0], ac_name, action_dict[ac_name]))
+                # Build only the AUTH UPnP soap requests
+                if "DeviceProtection" in s_type or "DeviceSecurity" in s_type:
+                    skip_AUTH = False
+                    for ac_name in action_dict:
+                        AUTH_soap_reqs.append(self.soapReqBuilder(s_type, services_dict[s_type][0], ac_name, action_dict[ac_name]))
             # Aggregate the built soap requests for each discovered location url
             if not skip_LAN:
                 # Only LAN soap requests
@@ -1076,10 +1099,14 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                 #  Only WAN soap requests
                 if WAN_soap_reqs:
                     WAN_reqs_dict [loc_url] = WAN_soap_reqs
+            if not skip_AUTH:
+                #  Only AUTH soap requests
+                if AUTH_soap_reqs:
+                    AUTH_reqs_dict [loc_url] = AUTH_soap_reqs
             # All soap requests
             if all_soap_reqs:
                 soap_reqs_dict[loc_url] = all_soap_reqs
-        return soap_reqs_dict, LAN_reqs_dict, WAN_reqs_dict
+        return soap_reqs_dict, LAN_reqs_dict, WAN_reqs_dict, AUTH_reqs_dict
 
 
 
@@ -1204,6 +1231,15 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
 
 
 
+    def getAUTHSOAPs(self, location_url):
+        AUTH_list = []
+        if location_url in self.AUTH_SOAPs:
+            AUTH_list = self.AUTH_SOAPs[location_url]
+        return AUTH_list
+
+
+
+
     def getSubscribes(self, location_url):
         sub_list = []
         if location_url in self.all_Subs:
@@ -1243,6 +1279,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.intruderbutton.setEnabled(False)
         self.LANrepeaterbutton.setEnabled(False)
         self.WANrepeaterbutton.setEnabled(False)
+        self.AUTHrepeaterbutton.setEnabled(False)
         self.Subrepeaterbutton.setEnabled(False)
         self.Presrepeaterbutton.setEnabled(False)
 
@@ -1250,6 +1287,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.all_SOAP_list = list(set(self.getAllSOAPs(selected_upnp)))
         self.LAN_SOAP_list = list(set(self.getLANSOAPs(selected_upnp)))
         self.WAN_SOAP_list = list(set(self.getWANSOAPs(selected_upnp)))
+        self.AUTH_SOAP_list = list(set(self.getAUTHSOAPs(selected_upnp)))
         self.Sub_list = list(set(self.getSubscribes(selected_upnp)))
         self.Pres_list = list(set(self.getPresentations(selected_upnp)))
 
@@ -1266,6 +1304,9 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         if len(self.WAN_SOAP_list) > 0:
             self.WANrepeaterbutton.setEnabled(True)
         self.labelWANCONNECTIONnum.setText(str(len(self.WAN_SOAP_list)))
+        if len(self.AUTH_SOAP_list) > 0:
+            self.AUTHrepeaterbutton.setEnabled(True)
+        self.labelAUTHnum.setText(str(len(self.AUTH_SOAP_list)))
         if len(self.Sub_list) > 0:
             self.Subrepeaterbutton.setEnabled(True)
         self.labelSubnum.setText(str(len(self.Sub_list)))
@@ -1279,20 +1320,16 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
     def sendWANUPnPToRepeater(self, e=None):
         # Send the WAN soap requests to the repeater tool
         if self.WAN_SOAP_list:
-            #i = 0
             print("[+] Sending to repeater only the WANIP/PPPConnection Soap requests")
             for soap_req in self.WAN_SOAP_list:
-                #i += 1
                 destination = re.search(r'Host: (.*?)\r\n', soap_req)
                 host = destination.group(1).split(":")[0]
                 if ":" in destination.group(1):
                     port = destination.group(1).split(":")[1]
                 else:
                     port = '80'
-                #tab_m = re.search(r'SOAPAction: [^#]*\#(.*?)\"\r\n', soap_req)
-                #tab = tab_m.group(1)
                 ba_req = bytearray(soap_req, 'utf-8')
-                self.callbacks.sendToRepeater(host, int(port), False, ba_req, None)# host+"_"+tab)
+                self.callbacks.sendToRepeater(host, int(port), False, ba_req, None)
 
 
 
@@ -1311,6 +1348,21 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                 ba_req = bytearray(soap_req, 'utf-8')
                 self.callbacks.sendToRepeater(host, int(port), False, ba_req, None)
 
+
+
+    def sendAUTHUPnPToRepeater(self, e=None):
+        # Send the AUTH soap requests to the repeater tool
+        if self.AUTH_SOAP_list:
+            print("[+] Sending to repeater only the AUTH Soap requests")
+            for soap_req in self.AUTH_SOAP_list:
+                destination = re.search(r'Host: (.*?)\r\n', soap_req)
+                host = destination.group(1).split(":")[0]
+                if ":" in destination.group(1):
+                    port = destination.group(1).split(":")[1]
+                else:
+                    port = '80'
+                ba_req = bytearray(soap_req, 'utf-8')
+                self.callbacks.sendToRepeater(host, int(port), False, ba_req, None)
 
 
 
