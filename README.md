@@ -18,7 +18,7 @@ UPnP BHunter provides a nice ;) three-step hunting console:
 
 The tutorial below explain, better than so many words, how to use the plugin:
 
-![UBH-Tutorial](ubh_tutorial.gif)
+![UBH-Tutorial](ubh_tutorial_new.gif)
 
 
 # Author
