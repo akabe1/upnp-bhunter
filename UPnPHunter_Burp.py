@@ -73,6 +73,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
     PLACEHOLDER = "FUZZ_HERE"
     SSDP_TIMEOUT = 2
     issues_dict = {}
+    target_ip = ""
     selected_target_ip = ""
     is_https = False
 
@@ -265,9 +266,9 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.label_step2 = JLabel("Found UPnp Services")
         self.label_totalSOAP = JLabel("Send all found SOAP requests (of the selected UPnP description)     ")
         self.label_totalSOAP.setForeground(Color(255,120,0))
-        self.labelstatus = JLabel("             Status")
-        self.labelempty_step1 = JLabel("                ")
-        self.labelempty_step2 = JLabel("  ")
+        self.labelstatus = JLabel("       Status")
+        #self.labelempty_step1 = JLabel("                ")
+        #self.labelempty_step2 = JLabel("                ")
         self.labelempty_step3 = JLabel("  ")
         self.labelupnp = JLabel("    UPnP description")
         self.labelip = JLabel("IP list")
@@ -283,15 +284,28 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.labelWANCONNECTIONnum = JLabel("0")
         self.labelSubnum = JLabel("0")
         self.labelPresnum = JLabel("0")
-        self.labelNoneServiceFound = JLabel("  ")
-        self.labelNoneServiceFound.setFont(Font('Light', Font.BOLD, 12))
-        self.labelNoneServiceFound.setForeground(Color.red)
+        self.labelerror_step1 = JLabel(" ")
+        self.labelerror_step1.setFont(Font('Light', Font.BOLD, 12))
+        self.labelerror_step1.setForeground(Color.red)
+        self.labelerror_step2 = JLabel(" ")
+        self.labelerror_step2.setFont(Font('Light', Font.BOLD, 12))
+        self.labelerror_step2.setForeground(Color.red)
 
         # Create combobox for IP version selection 
         self.ip_versions = ["IPv4", "IPv6"]
         self.combo_ipversion = JComboBox(self.ip_versions)
         self.combo_ipversion.setSelectedIndex(0)
         self.combo_ipversion.setEnabled(True)
+
+        # Create combobox for scope selection 
+        self.ip_scope = ["Multicast IP", "Single IP"]
+        self.combo_scope = JComboBox(self.ip_scope)
+        self.combo_scope.setSelectedIndex(0)
+        self.combo_scope.setEnabled(True)
+
+        self.textfield_step1 = JTextField("", 20)
+        #self.textfield_step1.setEnabled(False)
+
 
         # Create and configure progress bar
         self.progressbar = JProgressBar(0,100)
@@ -422,18 +436,28 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.targetpanel_step1 = JPanel()
         self.targetpanel_step1.add(self.label_step1)
         self.targetpanel_step1.add(self.combo_ipversion)
+        self.targetpanel_step1.add(self.combo_scope)
+
+        self.targetpanel_step1.add(self.textfield_step1)
         self.targetpanel_step1.add(self.startbutton)
         self.targetpanel_step1.add(self.clearbutton)
         self.targetpanel_step1.add(self.labelstatus)
         self.targetpanel_step1.add(self.progressbar)
-        self.emptypanel_step1 = JPanel()
-        self.emptypanel_step1.setLayout(BorderLayout())
-        self.emptypanel_step1.add(self.labelempty_step1,BorderLayout.WEST)
+
+        self.errorpanel_step1 = JPanel()
+        self.errorpanel_step1.setLayout(BorderLayout())
+        #self.errorpanel_step1.add(self.labelempty_step1,BorderLayout.WEST)
+        self.errorpanel_step1.add(self.labelerror_step1)
+
+        #self.emptypanel_step1 = JPanel()
+        #self.emptypanel_step1.setLayout(BorderLayout())
+        #self.emptypanel_step1.add(self.labelempty_step1,BorderLayout.WEST)
 
         # Assembling first step panel components
         self.panel_step1.add(self.titlepanel_step1,BorderLayout.NORTH)
         self.panel_step1.add(self.targetpanel_step1,BorderLayout.WEST)
-        self.panel_step1.add(self.emptypanel_step1,BorderLayout.SOUTH)
+        self.panel_step1.add(self.errorpanel_step1,BorderLayout.SOUTH)
+        #self.panel_step1.add(self.emptypanel_step1,BorderLayout.SOUTH)
         self.uiPanelA.setTopComponent(self.panel_step1)
 
         # Configuring second step panel
@@ -451,15 +475,16 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.selectpanel_step2.add(self.labelupnp)
         self.selectpanel_step2.add(self.upnpcombo_services)
         self.selectpanel_step2.add(self.confirmbutton)
-        self.emptypanel_step2 = JPanel()
-        self.emptypanel_step2.setLayout(BorderLayout())
-        self.emptypanel_step2.add(self.labelempty_step2,BorderLayout.WEST)
-        self.emptypanel_step2.add(self.labelNoneServiceFound)
+        
+        self.errorpanel_step2 = JPanel()
+        self.errorpanel_step2.setLayout(BorderLayout())
+        #self.errorpanel_step2.add(self.labelempty_step2,BorderLayout.WEST)
+        self.errorpanel_step2.add(self.labelerror_step2)
 
         # Assembling second step panel components
         self.panel_step2.add(self.titlepanel_step2,BorderLayout.NORTH)
         self.panel_step2.add(self.selectpanel_step2,BorderLayout.WEST)
-        self.panel_step2.add(self.emptypanel_step2,BorderLayout.SOUTH)
+        self.panel_step2.add(self.errorpanel_step2,BorderLayout.SOUTH)
         self.uiPanelB.setTopComponent(self.panel_step2) 
 
 
@@ -623,6 +648,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         # Reset all data of the plugin
         self.all_SOAPs, self.LAN_SOAPs, self.WAN_SOAPs, self.all_Subs, self.all_Pres = {}, {}, {}, {}, {}
         self.all_SOAP_list, self.LAN_SOAP_list, self.WAN_SOAP_list, self.Sub_list, self.Pres_list = [], [], [], [], []
+        self.textfield_step1.setText("")
+        self.labelerror_step1.setText(" ")
         self.upnpcombo_controls.removeAllItems()
         self.upnpcombo_controls.setEnabled(False)
         self.upnpcombo_actions.removeAllItems()
@@ -648,14 +675,14 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.labelSubnum.setText("0")
         self.Presrepeaterbutton.setEnabled(False)
         self.labelPresnum.setText("0")
-        self.labelNoneServiceFound.setText(" ")
+        self.labelerror_step2.setText(" ")
         print("[+] Clearing all data")
         return
 
 
 
 
-    def startHunting (self, e=None):
+    def startHunting(self, e=None):
         # Starting the UPnP hunt
         def startHunting_run():
             # Initialize the internal parameters every time the start-discovery button is clicked
@@ -663,7 +690,8 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.all_SOAP_list, self.LAN_SOAP_list, self.WAN_SOAP_list, self.Sub_list, self.Pres_list = [], [], [], [], []
             found_loc = []
             discovery_files = []
-            self.labelNoneServiceFound.setText(" ")
+            self.labelerror_step1.setText(" ")
+            self.labelerror_step2.setText(" ")
             self.intruderbutton.setEnabled(False)
             self.repeaterbutton.setEnabled(False)
             self.scannerbutton.setEnabled(False)
@@ -677,15 +705,40 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.labelSubnum.setText("0")
             self.Presrepeaterbutton.setEnabled(False)
             self.labelPresnum.setText("0")
-            
+            self.upnpcombo_controls.setEnabled(False)
+            self.upnpcombo_actions.setEnabled(False)
+            self.upnpcombo_controls.removeAllItems()
+            self.upnpcombo_actions.removeAllItems()
+            self.textarea_request.setText("")
+            self.upnpcombo_targets.removeAllItems()
+            self.upnpcombo_services.removeAllItems()
+
+
             # Then determine if targerting IPv4 or IPv6 adresses
             if self.combo_ipversion.getSelectedItem() == "IPv4":
                 self.ipv4_selected = True
-                print("[+] Selected IPv4 address scope")                
+                print("[+] Selected IPv4 target address")                
             else:
                 self.ipv4_selected = False
-                print("[+] Selected IPv6 address scope")
+                print("[+] Selected IPv6 target address")
 
+            if self.combo_scope.getSelectedItem() == "Multicast IP":
+                self.target_ip = self.textfield_step1.setText("")
+                self.target_ip = ""
+                print("[+] Selected multicast IP scope") 
+            else:
+                #self.textfield_step1.setEnabled(True)
+                if self.textfield_step1.getText():
+                    self.labelerror_step1.setText(" ")
+                    self.target_ip = self.textfield_step1.getText()
+                    print("[+] Selected single IP scope")
+                    self.ipValidator(self.target_ip)
+                else:
+                    self.labelerror_step1.setText("ERROR: an empty IP address was inserted !!!")
+                    print("[E] Selected single IP scope without inserting any IP value")
+                    return
+
+            
             # And here finally the hunt could start
             self.progressbar.setString("Running...")
             self.progressbar.setValue(20)
@@ -700,11 +753,15 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.progressbar.setString("Done")
             self.progressbar.setValue(100)
 
+            if not found_loc:
+                #self.labelerror_step2.setText("NONE UPnP DEVICE WAS FOUND, TRY AGAIN !!!")
+                self.labelerror_step2.setText("WARNING: none UPnP device was found !!!")
+                return
+
             # Update the step two comboboxes with the discovered UPnPs
             self.updateComboboxListFirst(found_loc)
             self.upnpcombo_targets.setEnabled(True)
-            self.upnpcombo_services.setEnabled(True)           
-
+            self.upnpcombo_services.setEnabled(True)      
 
             # Check and publish UpnP service detection issue
             self.publishUpnpDetectionIssue()
@@ -738,7 +795,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
 
             # Check if almost an UPnP service was detected
             if not self.getAllSOAPs(selected_upnp) and not self.getSubscribes and not getPresentations:
-                self.labelNoneServiceFound.setText("WARNING: no UPnP service was found for this location url")
+                self.labelerror_step2.setText("WARNING: none UPnP service was found for this location url !!!")
                 return
 
             # Disable all step three buttons every time the selected UPnP changes
@@ -792,6 +849,22 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.th.start()
 
 
+
+
+    def ipValidator(self, ip):
+        # Validate the manually inserted IP by user
+        if self.ipv4_selected:
+            if not (re.match(r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$', ip)):
+                # Invalid IPv4 address, the hunt is aborted 
+                print("[E] The specified target IPv4 address is not valid")
+                self.labelerror_step1.setText("ERROR: an invalid IPv4 addres was inserted !!!")
+                return
+        else:
+            if not (re.match(r'^(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))$', ip)):
+                # Invalid IPv6 address, the hunt is aborted 
+                print("[E] The specified target IPv6 address is not valid")
+                self.labelerror_step1.setText("ERROR: an invalid IPv6 addres was inserted !!!")
+                return
 
 
 
@@ -868,70 +941,144 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         locations = set()
         location_regex = re.compile("location:[ ]*(.+)\r\n", re.IGNORECASE)
         server_regex = re.compile("server:[ ]*(.+)\r\n", re.IGNORECASE)
-        # First check if targeting IPv4 or IPv6 addresses
-        if self.ipv4_selected:
-            # Using two possible type of ssdp requests 
-            ssdp_requests = [
-            self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT), 
-            self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
-            ]
-            # First try with "Ssdp:All" request type
-            print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
-            ssdp_responses = self.sendMsearch(ssdp_requests[0], self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
-            # Then try with the alternative "Root:Device" request type
-            if not ssdp_responses:
-                print("[+] Retrying with \"Root:Device\" ssdp request type")
-                ssdp_responses = self.sendMsearch(ssdp_requests[1], self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
-            # Extract location heaader information from ssdp response
-            if ssdp_responses:
-                for ssdp_resp in ssdp_responses:
-                    location_result = location_regex.search(ssdp_resp)
-                    server_result = server_regex.search(ssdp_resp)
-                    if location_result and (location_result.group(1) in locations) == False:
-                        locations.add(location_result.group(1))
-                        if server_result:
-                            self.issues_dict[location_result.group(1)] = {}
-                            self.issues_dict[location_result.group(1)]["server_id"] = server_result.group(1)
+        # If user inserted a specific target IP scope (both IPv4 and IPv6 are accepted)
+        if self.target_ip:
+            # First check if targeting IPv4 or IPv6 addresses
+            if self.ipv4_selected:
+                # Using two possible type of ssdp requests 
+                ssdp_requests = [
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT), 
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
+                ]
+                # First try with "Ssdp:All" request type
+                print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
+                ssdp_responses = self.sendMsearch(ssdp_requests[0], self.target_ip, self.SSDP_MULTICAST_PORT)
+                # Then try with the alternative "Root:Device" request type
+                if not ssdp_responses:
+                    print("[+] Retrying with \"Root:Device\" ssdp request type")
+                    ssdp_responses = self.sendMsearch(ssdp_requests[1], self.target_ip, self.SSDP_MULTICAST_PORT)
+                # Extract location heaader information from ssdp response
+                if ssdp_responses:
+                    for ssdp_resp in ssdp_responses:
+                        location_result = location_regex.search(ssdp_resp)
+                        server_result = server_regex.search(ssdp_resp)
+                        if location_result and (location_result.group(1) in locations) == False:
+                            locations.add(location_result.group(1))
+                            if server_result:
+                                self.issues_dict[location_result.group(1)] = {}
+                                self.issues_dict[location_result.group(1)]["server_id"] = server_result.group(1)
+                else:
+                    print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
+                upnp_locations = list(locations)
             else:
-                print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
-            upnp_locations = list(locations)
+                # Note: IPv6 addresses in Host header for RFC2732 have to be enclosed between square brackets
+                # Use four possible type of ssdp requests cause of IPv6 link-local and site-local adresses to support
+                ssdp_requests = [
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, "["+self.SSDP_MULTICAST_IPv6[0]+"]", self.SSDP_MULTICAST_PORT), 
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, "["+self.SSDP_MULTICAST_IPv6[0]+"]", self.SSDP_MULTICAST_PORT),
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, "["+self.SSDP_MULTICAST_IPv6[1]+"]", self.SSDP_MULTICAST_PORT), 
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, "["+self.SSDP_MULTICAST_IPv6[1]+"]", self.SSDP_MULTICAST_PORT)
+                ]
+                # IPv6 link-local section
+                # First try with "Ssdp:All" request type
+                print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
+                ssdp_responses_ll = self.sendMsearch(ssdp_requests[0], self.target_ip, self.SSDP_MULTICAST_PORT)
+                # Then try with the alternative "Root:Device" request type
+                if not ssdp_responses_ll:
+                    print("[+] Retrying with \"Root:Device\" ssdp request type")
+                    ssdp_responses_ll = self.sendMsearch(ssdp_requests[1], self.target_ip, self.SSDP_MULTICAST_PORT)
+                # IPv6 site-local section
+                # First try with "Ssdp:All" request type
+                print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
+                ssdp_responses_sl = self.sendMsearch(ssdp_requests[2], self.target_ip, self.SSDP_MULTICAST_PORT)
+                # Then try with the alternative "Root:Device" request type
+                if not ssdp_responses_sl:
+                    print("[+] Retrying with \"Root:Device\" ssdp request type")
+                    ssdp_responses_sl = self.sendMsearch(ssdp_requests[3], self.target_ip, self.SSDP_MULTICAST_PORT)
+                # Extract location heaader information from ssdp response
+                if ssdp_responses_ll or ssdp_responses_sl:
+                    # Merge all IPv6 SSDP responses
+                    ssdp_responses = ssdp_responses_ll + ssdp_responses_sl
+                    for ssdp_resp in ssdp_responses:
+                        location_result = location_regex.search(ssdp_resp)
+                        server_result = server_regex.search(ssdp_resp)
+                        if location_result and (location_result.group(1) in locations) == False:
+                            locations.add(location_result.group(1))
+                            if server_result:
+                                self.issues_dict[location_result.group(1)] = {}
+                                self.issues_dict[location_result.group(1)]["server_id"] = server_result.group(1)
+                else:
+                    print("[!] Unsucessfull hunt, the specified target IP does not has active UPnP services. Try with other target IPs")
+                upnp_locations = list(locations)
+        # If instead user chose the default SSDP multicast IP scope
         else:
-            # Note: IPv6 addresses in Host header for RFC2732 have to be enclosed between square brackets
-            # Use four possible type of ssdp requests cause of IPv6 link-local and site-local adresses to support
-            ssdp_requests = [
-            self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, "["+self.SSDP_MULTICAST_IPv6[0]+"]", self.SSDP_MULTICAST_PORT), 
-            self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, "["+self.SSDP_MULTICAST_IPv6[0]+"]", self.SSDP_MULTICAST_PORT),
-            self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, "["+self.SSDP_MULTICAST_IPv6[1]+"]", self.SSDP_MULTICAST_PORT), 
-            self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, "["+self.SSDP_MULTICAST_IPv6[1]+"]", self.SSDP_MULTICAST_PORT)
-            ]
-            # IPv6 link-local section
-            # First try with "Ssdp:All" request type
-            print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
-            ssdp_responses_ll = self.sendMsearch(ssdp_requests[0], self.SSDP_MULTICAST_IPv6[0], self.SSDP_MULTICAST_PORT)
-            # Then try with the alternative "Root:Device" request type
-            if not ssdp_responses_ll:
-                print("[+] Retrying with \"Root:Device\" ssdp request type")
-                ssdp_responses_ll = self.sendMsearch(ssdp_requests[1], self.SSDP_MULTICAST_IPv6[0], self.SSDP_MULTICAST_PORT)
-            # IPv6 site-local section
-            # First try with "Ssdp:All" request type
-            print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
-            ssdp_responses_sl = self.sendMsearch(ssdp_requests[2], self.SSDP_MULTICAST_IPv6[1], self.SSDP_MULTICAST_PORT)
-            # Then try with the alternative "Root:Device" request type
-            if not ssdp_responses_sl:
-                print("[+] Retrying with \"Root:Device\" ssdp request type")
-                ssdp_responses_sl = self.sendMsearch(ssdp_requests[3], self.SSDP_MULTICAST_IPv6[1], self.SSDP_MULTICAST_PORT)
-
-            # Extract location heaader information from ssdp response
-            if ssdp_responses_ll or ssdp_responses_sl:
-                # Merge all IPv6 SSDP responses
-                ssdp_responses = ssdp_responses_ll + ssdp_responses_sl
-                for ssdp_resp in ssdp_responses:
-                    location_result = location_regex.search(ssdp_resp)
-                    if location_result and (location_result.group(1) in locations) == False:
-                        locations.add(location_result.group(1))
+            # First check if targeting IPv4 or IPv6 addresses
+            if self.ipv4_selected:
+                # Using two possible type of ssdp requests 
+                ssdp_requests = [
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT), 
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
+                ]
+                # First try with "Ssdp:All" request type
+                print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
+                ssdp_responses = self.sendMsearch(ssdp_requests[0], self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
+                # Then try with the alternative "Root:Device" request type
+                if not ssdp_responses:
+                    print("[+] Retrying with \"Root:Device\" ssdp request type")
+                    ssdp_responses = self.sendMsearch(ssdp_requests[1], self.SSDP_MULTICAST_IPv4[0], self.SSDP_MULTICAST_PORT)
+                # Extract location heaader information from ssdp response
+                if ssdp_responses:
+                    for ssdp_resp in ssdp_responses:
+                        location_result = location_regex.search(ssdp_resp)
+                        server_result = server_regex.search(ssdp_resp)
+                        if location_result and (location_result.group(1) in locations) == False:
+                            locations.add(location_result.group(1))
+                            if server_result:
+                                self.issues_dict[location_result.group(1)] = {}
+                                self.issues_dict[location_result.group(1)]["server_id"] = server_result.group(1)
+                else:
+                    print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
+                upnp_locations = list(locations)
             else:
-                print("[!] Unsucessfull hunt, no active UPnP service was found. Try with other target IPs")
-            upnp_locations = list(locations)
+                # Note: IPv6 addresses in Host header for RFC2732 have to be enclosed between square brackets
+                # Use four possible type of ssdp requests cause of IPv6 link-local and site-local adresses to support
+                ssdp_requests = [
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, "["+self.SSDP_MULTICAST_IPv6[0]+"]", self.SSDP_MULTICAST_PORT), 
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, "["+self.SSDP_MULTICAST_IPv6[0]+"]", self.SSDP_MULTICAST_PORT),
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ALL, "["+self.SSDP_MULTICAST_IPv6[1]+"]", self.SSDP_MULTICAST_PORT), 
+                self.ssdpReqBuilder(self.SSDP_TIMEOUT, self.ST_ROOTDEV, "["+self.SSDP_MULTICAST_IPv6[1]+"]", self.SSDP_MULTICAST_PORT)
+                ]
+                # IPv6 link-local section
+                # First try with "Ssdp:All" request type
+                print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
+                ssdp_responses_ll = self.sendMsearch(ssdp_requests[0], self.SSDP_MULTICAST_IPv6[0], self.SSDP_MULTICAST_PORT)
+                # Then try with the alternative "Root:Device" request type
+                if not ssdp_responses_ll:
+                    print("[+] Retrying with \"Root:Device\" ssdp request type")
+                    ssdp_responses_ll = self.sendMsearch(ssdp_requests[1], self.SSDP_MULTICAST_IPv6[0], self.SSDP_MULTICAST_PORT)
+                # IPv6 site-local section
+                # First try with "Ssdp:All" request type
+                print("[+] Start hunting with \"Ssdp:All\" ssdp request type")
+                ssdp_responses_sl = self.sendMsearch(ssdp_requests[2], self.SSDP_MULTICAST_IPv6[1], self.SSDP_MULTICAST_PORT)
+                # Then try with the alternative "Root:Device" request type
+                if not ssdp_responses_sl:
+                    print("[+] Retrying with \"Root:Device\" ssdp request type")
+                    ssdp_responses_sl = self.sendMsearch(ssdp_requests[3], self.SSDP_MULTICAST_IPv6[1], self.SSDP_MULTICAST_PORT)
+                # Extract location heaader information from ssdp response
+                if ssdp_responses_ll or ssdp_responses_sl:
+                    # Merge all IPv6 SSDP responses
+                    ssdp_responses = ssdp_responses_ll + ssdp_responses_sl
+                    for ssdp_resp in ssdp_responses:
+                        location_result = location_regex.search(ssdp_resp)
+                        server_result = server_regex.search(ssdp_resp)
+                        if location_result and (location_result.group(1) in locations) == False:
+                            locations.add(location_result.group(1))
+                            if server_result:
+                                self.issues_dict[location_result.group(1)] = {}
+                                self.issues_dict[location_result.group(1)]["server_id"] = server_result.group(1)
+                else:
+                    print("[!] Unsucessfull hunt, no active UPnP service was found on network")
+                upnp_locations = list(locations)
         # Finally return the discovered locations
         return upnp_locations
 
@@ -948,8 +1095,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.upnpcombo_services.removeAllItems()
             # First check if any UPnP service was found
             if not cb_list:
-                self.upnpcombo_targets.addItem("No UPnP device found")
-                self.upnpcombo_services.addItem("No UPnP service found")
+                #self.upnpcombo_targets.addItem("No UPnP device found")
                 return
             # Build a dict of found IPs and location urls
             for cb_url in cb_list:
@@ -990,8 +1136,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.upnpcombo_actions.removeAllItems()
             # First check if any UPnP service was found
             if not cb_dict:
-                self.upnpcombo_controls.addItem("No UPnP control found")
-                self.upnpcombo_action.addItem("No UPnP action found")
+                #self.upnpcombo_controls.addItem("No UPnP control found")
                 return
             # Below section probably is not necessary
             # Set the found SCPD control urls on the control list combobox
@@ -1026,7 +1171,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
             self.textarea_request.setText(" ")
             # First check if any UPnP service was found
             if not cb_dict:
-                self.upnpcombo_action.addItem("No UPnP action found")
+                #self.upnpcombo_action.addItem("No UPnP action found")
                 return
             # Below section probably is not necessary
             # Set the found actions in the action list combobox
