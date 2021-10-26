@@ -267,8 +267,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.label_totalSOAP = JLabel("Send all found SOAP requests (of the selected UPnP description)     ")
         self.label_totalSOAP.setForeground(Color(255,120,0))
         self.labelstatus = JLabel("       Status")
-        #self.labelempty_step1 = JLabel("                ")
-        #self.labelempty_step2 = JLabel("                ")
         self.labelempty_step3 = JLabel("  ")
         self.labelupnp = JLabel("    UPnP description")
         self.labelip = JLabel("IP list")
@@ -290,6 +288,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.labelerror_step2 = JLabel(" ")
         self.labelerror_step2.setFont(Font('Light', Font.BOLD, 12))
         self.labelerror_step2.setForeground(Color.red)
+        self.textfield_step1 = JTextField("", 20)
 
         # Create combobox for IP version selection 
         self.ip_versions = ["IPv4", "IPv6"]
@@ -303,8 +302,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         self.combo_scope.setSelectedIndex(0)
         self.combo_scope.setEnabled(True)
 
-        self.textfield_step1 = JTextField("", 20)
-        #self.textfield_step1.setEnabled(False)
+
 
 
         # Create and configure progress bar
@@ -446,18 +444,12 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
 
         self.errorpanel_step1 = JPanel()
         self.errorpanel_step1.setLayout(BorderLayout())
-        #self.errorpanel_step1.add(self.labelempty_step1,BorderLayout.WEST)
         self.errorpanel_step1.add(self.labelerror_step1)
-
-        #self.emptypanel_step1 = JPanel()
-        #self.emptypanel_step1.setLayout(BorderLayout())
-        #self.emptypanel_step1.add(self.labelempty_step1,BorderLayout.WEST)
 
         # Assembling first step panel components
         self.panel_step1.add(self.titlepanel_step1,BorderLayout.NORTH)
         self.panel_step1.add(self.targetpanel_step1,BorderLayout.WEST)
         self.panel_step1.add(self.errorpanel_step1,BorderLayout.SOUTH)
-        #self.panel_step1.add(self.emptypanel_step1,BorderLayout.SOUTH)
         self.uiPanelA.setTopComponent(self.panel_step1)
 
         # Configuring second step panel
@@ -478,7 +470,6 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
         
         self.errorpanel_step2 = JPanel()
         self.errorpanel_step2.setLayout(BorderLayout())
-        #self.errorpanel_step2.add(self.labelempty_step2,BorderLayout.WEST)
         self.errorpanel_step2.add(self.labelerror_step2)
 
         # Assembling second step panel components
@@ -727,12 +718,20 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                 self.target_ip = ""
                 print("[+] Selected multicast IP scope") 
             else:
-                #self.textfield_step1.setEnabled(True)
                 if self.textfield_step1.getText():
                     self.labelerror_step1.setText(" ")
                     self.target_ip = self.textfield_step1.getText()
-                    print("[+] Selected single IP scope")
                     self.ipValidator(self.target_ip)
+                    print("[+] Selected single target IP :"+self.target_ip)
+
+                    # Check to avoid broadcast IP addresses in input
+                    ipv6_shortened = ""
+                    ipv6_broadcast = ["ff02::1", "ff02:::1", "ff02::::1", "ff02:::::1", "ff02::::::1", "ff02:::::::1"]
+                    if not self.ipv4_selected:
+                        ipv6_shortened = ':'.join('' if i in ['0000', '000', '00'] else i.lstrip('0') for i in self.target_ip.split(':'))
+                    if self.target_ip == "255.255.255.255" or ipv6_shortened in ipv6_broadcast:
+                        self.labelerror_step1.setText("BOOOOOOOOOM !!!")
+                        return
                 else:
                     self.labelerror_step1.setText("ERROR: an empty IP address was inserted !!!")
                     print("[E] Selected single IP scope without inserting any IP value")
