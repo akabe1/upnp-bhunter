@@ -1547,7 +1547,7 @@ class BurpExtender(IBurpExtender, ITab, IExtensionStateListener):#, IScanIssue, 
                     # Build the issues dictionary
                     self.issues_dict[loc_url]["subs_URL"] = services_dict[s_type][2]
                     scpd_url = services_dict[s_type][1]
-                    sub_url = urlparse(services_dict[s_type][2]).path.split("/",2)[2].replace("/", "")
+                    sub_url = "".join(urlparse(services_dict[s_type][2]).path.split("/"))
                     # Build All the UPnP subscribe requests
                     if s_type != 'presentation_upnpbhunter':
                         if services_dict[s_type][2]:
